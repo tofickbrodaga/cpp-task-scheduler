@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  scheduler:
+    build: .
+    container_name: cpp_scheduler
+    ports:
+      - "18080:18080"
+    volumes:
+      - ./data:/app/data
+    working_dir: /app

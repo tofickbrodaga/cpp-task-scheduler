@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>C++ Task Scheduler</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+        .task { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #ccc; }
+        .completed { text-decoration: line-through; color: gray; }
+        button { cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Планировщик задач (C++)</h1>
+    
+    <div>
+        <input type="text" id="taskInput" placeholder="Новая задача...">
+        <button onclick="addTask()">Добавить</button>
+    </div>
+    
+    <div id="taskList"></div>
+
+    <script>
+        async function loadTasks() {
+            const res = await fetch('/api/tasks');
+            const tasks = await res.json();
+            const list = document.getElementById('taskList');
+            list.innerHTML = '';
+            
+            tasks.forEach(task => {
+                const div = document.createElement('div');
+                div.className = 'task';
+                div.innerHTML = `
+                    <span class="${task.completed ? 'completed' : ''}" onclick="toggleTask(${task.id})">
+                        ${task.title}
+                    </span>
+                    <button onclick="deleteTask(${task.id})">❌</button>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        async function addTask() {
+            const input = document.getElementById('taskInput');
+            if(!input.value) return;
+            
+            await fetch('/api/tasks', {
+                method: 'POST',
+                body: JSON.stringify({title: input.value})
+            });
+            input.value = '';
+            loadTasks();
+        }
+
+        async function toggleTask(id) {
+            await fetch(`/api/tasks/${id}/toggle`, { method: 'PUT' });
+            loadTasks();
+        }
+
+        async function deleteTask(id) {
+            await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+            loadTasks();
+        }
+
+        loadTasks();
+    </script>
+</body>
+</html>
