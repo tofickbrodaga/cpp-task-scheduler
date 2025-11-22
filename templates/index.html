@@ -1,68 +1,104 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>C++ Task Scheduler</title>
-    <style>
-        body { font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
-        .task { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #ccc; }
-        .completed { text-decoration: line-through; color: gray; }
-        button { cursor: pointer; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Планировщик задач</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <h1>Планировщик задач (C++)</h1>
+
+<div class="container">
+    <h1>⚡ C++ Scheduler</h1>
     
-    <div>
-        <input type="text" id="taskInput" placeholder="Новая задача...">
-        <button onclick="addTask()">Добавить</button>
+    <div class="input-group">
+        <input type="text" id="taskInput" placeholder="Что нужно сделать? (Enter)">
+        <button class="btn-add" onclick="addTask()">Add</button>
     </div>
-    
+
     <div id="taskList"></div>
 
-    <script>
-        async function loadTasks() {
-            const res = await fetch('/api/tasks');
-            const tasks = await res.json();
-            const list = document.getElementById('taskList');
-            list.innerHTML = '';
-            
-            tasks.forEach(task => {
-                const div = document.createElement('div');
-                div.className = 'task';
-                div.innerHTML = `
-                    <span class="${task.completed ? 'completed' : ''}" onclick="toggleTask(${task.id})">
-                        ${task.title}
-                    </span>
-                    <button onclick="deleteTask(${task.id})">❌</button>
-                `;
-                list.appendChild(div);
-            });
-        }
+    <button class="btn-clear" onclick="clearCompleted()">🗑 Очистить выполненные</button>
+</div>
 
-        async function addTask() {
-            const input = document.getElementById('taskInput');
-            if(!input.value) return;
-            
-            await fetch('/api/tasks', {
-                method: 'POST',
-                body: JSON.stringify({title: input.value})
-            });
-            input.value = '';
-            loadTasks();
-        }
+<script>
+    document.getElementById("taskInput").addEventListener("keyup", function(event) {
+        if (event.key === "Enter") addTask();
+    });
 
-        async function toggleTask(id) {
-            await fetch(`/api/tasks/${id}/toggle`, { method: 'PUT' });
-            loadTasks();
-        }
+    async function loadTasks() {
+        const res = await fetch('/api/tasks');
+        const tasks = await res.json();
+        const list = document.getElementById('taskList');
+        list.innerHTML = '';
+        
+        tasks.forEach(task => {
+            const div = document.createElement('div');
+            div.className = `task ${task.completed ? 'done' : ''}`;
 
-        async function deleteTask(id) {
-            await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
-            loadTasks();
-        }
+            const safeTitle = task.title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
+            div.innerHTML = `
+                <button class="icon-btn" onclick="toggleTask(${task.id})">
+                    ${task.completed ? '✅' : '⬜'}
+                </button>
+                
+                <span class="task-text" onclick="editTask(${task.id}, '${safeTitle}')">
+                    ${task.title}
+                </span>
+
+                <div class="actions">
+                    <button class="icon-btn" onclick="editTask(${task.id}, '${safeTitle}')">✏️</button>
+                    <button class="icon-btn" onclick="deleteTask(${task.id})">❌</button>
+                </div>
+            `;
+            list.appendChild(div);
+        });
+    }
+
+    async function addTask() {
+        const input = document.getElementById('taskInput');
+        if(!input.value.trim()) return;
+        
+        await fetch('/api/tasks', {
+            method: 'POST',
+            body: JSON.stringify({title: input.value})
+        });
+        input.value = '';
         loadTasks();
-    </script>
+    }
+
+    async function toggleTask(id) {
+        await fetch(`/api/tasks/${id}/toggle`, { method: 'PUT' });
+        loadTasks();
+    }
+
+    async function deleteTask(id) {
+        if(!confirm('Удалить задачу?')) return;
+        await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+        loadTasks();
+    }
+
+    async function editTask(id, oldTitle) {
+        const newTitle = prompt("Изменить задачу:", oldTitle);
+        if (newTitle !== null && newTitle.trim() !== "") {
+            await fetch(`/api/tasks/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify({title: newTitle})
+            });
+            loadTasks();
+        }
+    }
+
+    async function clearCompleted() {
+        if(!confirm('Удалить все завершенные задачи?')) return;
+        await fetch('/api/tasks/completed', { method: 'DELETE' });
+        loadTasks();
+    }
+
+    loadTasks();
+</script>
+
 </body>
 </html>

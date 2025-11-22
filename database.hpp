@@ -45,7 +45,7 @@ public:
 
     vector<Task> getTasks() {
         vector<Task> tasks;
-        string sql = "SELECT id, title, completed FROM tasks;";
+        string sql = "SELECT id, title, completed FROM tasks ORDER BY id DESC;";
         sqlite3_stmt* stmt;
 
         if (sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, 0) == SQLITE_OK) {
@@ -71,8 +71,18 @@ public:
         sqlite3_exec(db, sql.c_str(), 0, 0, 0);
     }
 
+    void updateTaskTitle(int id, const string& newTitle) {
+        string sql = "UPDATE tasks SET title = '" + newTitle + "' WHERE id = " + to_string(id) + ";";
+        sqlite3_exec(db, sql.c_str(), 0, 0, 0);
+    }
+
     void deleteTask(int id) {
         string sql = "DELETE FROM tasks WHERE id = " + to_string(id) + ";";
+        sqlite3_exec(db, sql.c_str(), 0, 0, 0);
+    }
+
+    void deleteCompleted() {
+        string sql = "DELETE FROM tasks WHERE completed = 1;";
         sqlite3_exec(db, sql.c_str(), 0, 0, 0);
     }
 };

@@ -1,5 +1,7 @@
 FROM ubuntu:22.04 AS builder
+
 ENV DEBIAN_FRONTEND=noninteractive
+
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
@@ -8,7 +10,7 @@ RUN apt-get update && apt-get install -y \
     libasio-dev \
     nlohmann-json3-dev \
     wget \
-    pkg-config 
+    pkg-config
 
 RUN wget https://github.com/CrowCpp/Crow/releases/download/v1.0+5/crow_all.h -O /usr/local/include/crow_all.h
 
@@ -19,14 +21,15 @@ RUN mkdir build && cd build && \
     cmake .. && \
     make
 
-
 FROM ubuntu:22.04
+
 RUN apt-get update && apt-get install -y libsqlite3-0 && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY --from=builder /app/build/scheduler .
 COPY --from=builder /app/templates ./templates
+COPY --from=builder /app/static ./static
 
 EXPOSE 18080
 
