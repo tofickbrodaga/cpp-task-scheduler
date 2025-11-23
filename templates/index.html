@@ -3,53 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Планировщик задач</title>
+    <title>C++ project</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 
 <div class="container">
-    <h1>⚡ C++ Scheduler</h1>
+    <h1>⏱️ C++ Планировщик и трекер задач</h1>
     
     <div class="input-group">
-        <input type="text" id="taskInput" placeholder="Что нужно сделать? (Enter)">
+        <input type="text" id="taskInput" placeholder="Новая задача... (Enter)">
         <button class="btn-add" onclick="addTask()">Add</button>
     </div>
 
     <div id="taskList"></div>
 
-    <button class="btn-clear" onclick="clearCompleted()">🗑 Очистить выполненные</button>
+    <button class="btn-clear" onclick="clearCompleted()">🗑 Удалить завершенные</button>
 </div>
 
 <script>
-    document.getElementById("taskInput").addEventListener("keyup", function(event) {
-        if (event.key === "Enter") addTask();
-    });
+    let tasksData = [];
+
+    function formatTime(seconds) {
+        const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
+        const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+        const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+        return `${h}:${m}:${s}`;
+    }
 
     async function loadTasks() {
         const res = await fetch('/api/tasks');
-        const tasks = await res.json();
+        tasksData = await res.json();
+        renderTasks();
+    }
+
+    function renderTasks() {
         const list = document.getElementById('taskList');
         list.innerHTML = '';
         
-        tasks.forEach(task => {
+        tasksData.forEach(task => {
+            const isRunning = task.start_timestamp > 0;
             const div = document.createElement('div');
-            div.className = `task ${task.completed ? 'done' : ''}`;
+            div.className = `task status-${task.status} ${isRunning ? 'running' : ''}`;
 
             const safeTitle = task.title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
+            let currentSeconds = task.time_spent;
+            if (isRunning) {
+                const now = Math.floor(Date.now() / 1000);
+                currentSeconds += (now - task.start_timestamp);
+            }
+
             div.innerHTML = `
-                <button class="icon-btn" onclick="toggleTask(${task.id})">
-                    ${task.completed ? '✅' : '⬜'}
-                </button>
-                
-                <span class="task-text" onclick="editTask(${task.id}, '${safeTitle}')">
-                    ${task.title}
-                </span>
+                <div class="task-info">
+                    <span class="task-title" onclick="editTask(${task.id}, '${safeTitle}')">${task.title}</span>
+                    <div class="task-meta">
+                        <span class="timer-badge" id="timer-${task.id}">${formatTime(currentSeconds)}</span>
+                    </div>
+                </div>
+
+                <select class="status-select" onchange="changeStatus(${task.id}, this.value)">
+                    <option value="todo" ${task.status === 'todo' ? 'selected' : ''}>To Do</option>
+                    <option value="in_progress" ${task.status === 'in_progress' ? 'selected' : ''}>In Progress</option>
+                    <option value="done" ${task.status === 'done' ? 'selected' : ''}>Done</option>
+                </select>
 
                 <div class="actions">
-                    <button class="icon-btn" onclick="editTask(${task.id}, '${safeTitle}')">✏️</button>
+                    <button class="icon-btn" onclick="toggleTimer(${task.id})" title="${isRunning ? 'Pause' : 'Start'}">
+                        ${isRunning ? '⏸️' : '▶️'}
+                    </button>
                     <button class="icon-btn" onclick="deleteTask(${task.id})">❌</button>
                 </div>
             `;
@@ -57,10 +80,24 @@
         });
     }
 
+    setInterval(() => {
+        const now = Math.floor(Date.now() / 1000);
+        tasksData.forEach(task => {
+            if (task.start_timestamp > 0) {
+                const total = task.time_spent + (now - task.start_timestamp);
+                const el = document.getElementById(`timer-${task.id}`);
+                if (el) el.innerText = formatTime(total);
+            }
+        });
+    }, 1000);
+
+    document.getElementById("taskInput").addEventListener("keyup", function(event) {
+        if (event.key === "Enter") addTask();
+    });
+
     async function addTask() {
         const input = document.getElementById('taskInput');
         if(!input.value.trim()) return;
-        
         await fetch('/api/tasks', {
             method: 'POST',
             body: JSON.stringify({title: input.value})
@@ -69,20 +106,28 @@
         loadTasks();
     }
 
-    async function toggleTask(id) {
-        await fetch(`/api/tasks/${id}/toggle`, { method: 'PUT' });
+    async function changeStatus(id, newStatus) {
+        await fetch(`/api/tasks/${id}/status`, {
+            method: 'PUT',
+            body: JSON.stringify({status: newStatus})
+        });
+        loadTasks();
+    }
+
+    async function toggleTimer(id) {
+        await fetch(`/api/tasks/${id}/timer`, { method: 'POST' });
         loadTasks();
     }
 
     async function deleteTask(id) {
-        if(!confirm('Удалить задачу?')) return;
+        if(!confirm('Удалить?')) return;
         await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
         loadTasks();
     }
 
     async function editTask(id, oldTitle) {
-        const newTitle = prompt("Изменить задачу:", oldTitle);
-        if (newTitle !== null && newTitle.trim() !== "") {
+        const newTitle = prompt("Изменить название:", oldTitle);
+        if (newTitle && newTitle.trim()) {
             await fetch(`/api/tasks/${id}`, {
                 method: 'PUT',
                 body: JSON.stringify({title: newTitle})
@@ -92,7 +137,7 @@
     }
 
     async function clearCompleted() {
-        if(!confirm('Удалить все завершенные задачи?')) return;
+        if(!confirm('Удалить все Done задачи?')) return;
         await fetch('/api/tasks/completed', { method: 'DELETE' });
         loadTasks();
     }
